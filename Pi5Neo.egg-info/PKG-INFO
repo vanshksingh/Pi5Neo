@@ -1,0 +1,40 @@
+Metadata-Version: 2.1
+Name: Pi5Neo
+Version: 1.0.0
+Summary: A NeoPixel LED control library for Raspberry Pi 5 using SPI
+Home-page: https://github.com/vanshksingh/pi5neo
+Author: Vansh Kumar Singh
+Author-email: vsvsasas@gmail.com
+Keywords: raspberrypi5,neopixel,spi,led-strip,hardware
+Platform: Raspberry Pi 5
+Platform: Equivalent Raspberry Pi boards
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Topic :: System :: Hardware :: Hardware Drivers
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# Pi5Neo
+
+Pi5Neo is a Python library for controlling NeoPixel LED strips on Raspberry Pi 5 using SPI communication.
+
+## Installation
+
+pip install pi5neo
+Usage
+
+python
+Copy code
+from pi5neo import Pi5Neo
+
+# Initialize the Pi5Neo class with 10 LEDs
+
+pi5_neo = Pi5Neo('/dev/spidev0.0', 10, 800)
+
+# Set the entire strip to red
+
+pi5_neo.fill_strip(255, 0, 0)
+pi5_neo.update_strip()

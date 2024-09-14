@@ -1,5 +1,4 @@
-# examples/example_usage.py
-from pi5neo import Pi5Neo
+from pi5neo import Pi5Neo  # Import the Pi5Neo class
 import time
 
 def demo_solid_color(neo, red, green, blue, duration=2):
