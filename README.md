@@ -1,12 +1,12 @@
 # Pi5Neo
 
-![IMG_7596](https://github.com/user-attachments/assets/6fb727ae-789e-4d25-9dd7-38599fdbb81e)
-
 ### Simplifying NeoPixel LED Control on Raspberry Pi 5 via SPI
 
 [![PyPI version](https://badge.fury.io/py/Pi5Neo.svg)](https://badge.fury.io/py/Pi5Neo) 
 [![Python Versions](https://img.shields.io/pypi/pyversions/Pi5Neo.svg)](https://pypi.org/project/Pi5Neo)
 [![License](https://img.shields.io/github/license/vanshksingh/Pi5Neo)](LICENSE)
+
+![IMG_7596](https://github.com/user-attachments/assets/6fb727ae-789e-4d25-9dd7-38599fdbb81e)
 
 Pi5Neo is a Python library designed to make controlling **NeoPixel LED strips** super easy and efficient on the **Raspberry Pi 5** (or equivalent boards). Whether you're creating dazzling light shows, informative displays, or ambient lighting, Pi5Neo simplifies the process using the Raspberry Pi’s **SPI interface** for high-performance communication.
 
