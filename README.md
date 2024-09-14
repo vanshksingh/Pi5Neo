@@ -1,5 +1,7 @@
 # Pi5Neo
 
+![Uploading IMG_7596.jpeg…]()
+
 ### Simplifying NeoPixel LED Control on Raspberry Pi 5 via SPI
 
 [![PyPI version](https://badge.fury.io/py/Pi5Neo.svg)](https://badge.fury.io/py/Pi5Neo) 
