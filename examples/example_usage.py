@@ -1,5 +1,6 @@
 # examples/example_usage.py
 from pi5neo import Pi5Neo
+import time
 
 def demo_solid_color(neo, red, green, blue, duration=2):
     """Set the entire strip to a solid color and hold for a duration"""
