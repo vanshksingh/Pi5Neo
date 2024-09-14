@@ -1,6 +1,6 @@
 # Pi5Neo
 
-![Uploading IMG_7596.jpeg…]()
+![IMG_7596](https://github.com/user-attachments/assets/6fb727ae-789e-4d25-9dd7-38599fdbb81e)
 
 ### Simplifying NeoPixel LED Control on Raspberry Pi 5 via SPI
 
