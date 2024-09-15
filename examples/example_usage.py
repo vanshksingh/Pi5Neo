@@ -1,3 +1,4 @@
+#basic example of using the Pi5Neo class to control a NeoPixel strip
 from pi5neo import Pi5Neo  # Import the Pi5Neo class
 import time
 

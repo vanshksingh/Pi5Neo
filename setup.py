@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='Pi5Neo',
-    version='1.0.4',
+    version='1.0.5',
     description='A NeoPixel LED control library for Raspberry Pi 5 using SPI',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',

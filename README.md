@@ -140,6 +140,5 @@ Now, let your **Raspberry Pi 5** light up the room with **Pi5Neo**!
 ### 🔗 Useful Links
 - [Pi5Neo on PyPI](https://pypi.org/project/Pi5Neo)
 - [Pi5Neo GitHub Repository](https://github.com/vanshksingh/Pi5Neo)
-- [Documentation](https://github.com/vanshksingh/Pi5Neo/wiki)
 - [Raspberry Pi Official Website](https://www.raspberrypi.org)
 
