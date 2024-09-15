@@ -39,7 +39,7 @@ class Pi5Neo:
     def send_spi_data(self):
         """Send the raw data buffer to the NeoPixel strip via SPI"""
         spi_message = bytes(self.raw_data)
-        self.spi.xfer2(list(spi_message))
+        self.spi.xfer3(list(spi_message))
 
     def bitmask(self, byte, position):
         """Retrieve the value of a specific bit in a byte"""
