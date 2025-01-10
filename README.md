@@ -77,7 +77,7 @@ def rainbow_cycle(neo, delay=0.1):
         neo.update_strip()
         time.sleep(delay)
 
-neo = Pi5Neo('/dev/spidev0.0', 10, 800)
+neo = Pi5Neo('/dev/spidev0.0', 10, 800) #GPIO 10
 rainbow_cycle(neo)
 ```
 
@@ -94,7 +94,7 @@ def loading_bar(neo):
     neo.clear_strip()
     neo.update_strip()
 
-neo = Pi5Neo('/dev/spidev0.0', 10, 800)
+neo = Pi5Neo('/dev/spidev0.0', 10, 800) #GPIO 10
 loading_bar(neo)
 ```
 
