@@ -119,6 +119,13 @@ Pi5Neo('/dev/spidev0.0', num_leds=20, spi_speed_khz=1000)
 - **`num_leds`**: Number of LEDs in the NeoPixel strip
 - **`spi_speed_khz`**: SPI speed in kHz (default 800)
 
+## Driving High LED Counts
+
+The default `spidev` buffer of 4096 bytes accommodates approximately 170 LEDs. For higher LED counts, it is necessary to increase this buffer. This is done by adding `spidev.bufsiz=<size_in_bytes>` to the single line in `/boot/firmware/cmdline.txt` and rebooting.
+
+For example, to set the buffer to 32KB:
+`spidev.bufsiz=32768`
+
 ## 🛠️ Contributing
 
 We welcome contributions from the community! To contribute:
