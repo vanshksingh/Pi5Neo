@@ -16,9 +16,11 @@ class LEDColor:
         self.white = white
 
 class Pi5Neo:
-    def __init__(self, spi_device='/dev/spidev0.0', num_leds=10, spi_speed_khz=800, pixel_type=EPixelType.RGB, quiet_mode=False):
+    def __init__(self, spi_device='/dev/spidev0.0', num_leds=10, pixel_range=[], spi_speed_khz=800, pixel_type=EPixelType.RGB, quiet_mode=False):
         """Initialize the Pi5Neo class with SPI device, number of LEDs, speed, pixel type, and optional quiet mode"""
         self.num_leds = num_leds
+        # allows us to selectively control a daisy-chained strip
+        self.pixel_range = pixel_range if pixel_range not [] else [0,num_leds-1]
         self.pixel_type = pixel_type
         self.quiet_mode = quiet_mode
         self.spi_speed = spi_speed_khz * 1024 * 8  # Convert kHz to bytes per second
@@ -93,13 +95,14 @@ class Pi5Neo:
         self.fill_strip(0, 0, 0, 0)
 
     def fill_strip(self, red=0, green=0, blue=0, white=0):
-        """Fill the entire strip with a specific color"""
+        """Fill the entire strip, or pixel_range, with a specific color"""
         color = LEDColor(red, green, blue, white)
-        self.led_state = [color] * self.num_leds  # Set all LEDs to the same color
+        for i in range(*self.pixel_range):
+            led = self.led_state[i] = color # Set all LEDs to the same color
 
     def set_led_color(self, index, red, green, blue, white=0):
         """Set the color of an individual LED"""
-        if 0 <= index < self.num_leds:
+        if index >= self.pixel_range[0] and index <= self.pixel_range[1]:
             self.led_state[index] = LEDColor(red, green, blue, white)
             return True
         return False
@@ -113,7 +116,6 @@ class Pi5Neo:
         total_bytes = 0
         for i in range(self.num_leds):
             led = self.led_state[i]  # Get the color for each LED
-
             if self.pixel_type is EPixelType.RGB:
                 bitstream = self.rgb_to_spi_bitstream(led.red, led.green, led.blue)
             elif self.pixel_type is EPixelType.RGBW:
