@@ -2,10 +2,13 @@
 import spidev
 import time
 from enum import Enum
+from warnings import deprecated
 
 class EPixelType(Enum):
     RGB = 'RGB'
+    GRB = 'GRB'
     RGBW = 'RGBW'
+    GRBW = 'GRBW'
 
 class LEDColor:
     """Represents an RGB or RGBW color for the NeoPixels"""
@@ -26,9 +29,9 @@ class Pi5Neo:
 
         # Determine bytes per LED based on pixel_type
         self.pixel_type = pixel_type
-        if self.pixel_type is EPixelType.RGB:
+        if (self.pixel_type is EPixelType.RGB) or (self.pixel_type is EPixelType.GRB):
             self.bytes_per_led = 24  # 3 channels * 8 bits/channel
-        elif self.pixel_type is EPixelType.RGBW:
+        elif (self.pixel_type is EPixelType.RGBW) or (self.pixel_type is EPixelType.GRBW):
             self.bytes_per_led = 32  # 4 channels * 8 bits/channel
         else:
             raise ValueError("Invalid pixel_type. Must be one of EPixelType.")
@@ -73,6 +76,7 @@ class Pi5Neo:
                 bitstream[i] = 0xF8  # Set HIGH bits for '1'
         return bitstream
 
+    @deprecated("Use color_to_spi_bitstream() instead")
     def rgb_to_spi_bitstream(self, red, green, blue):
         """Convert RGB values to the NeoPixel bitstream format for SPI"""
         green_bits = self.byte_to_bitstream(green)  # Send green first
@@ -80,6 +84,7 @@ class Pi5Neo:
         blue_bits = self.byte_to_bitstream(blue)  # Then blue
         return green_bits + red_bits + blue_bits  # Concatenate GRB order
 
+    @deprecated("Use color_to_spi_bitstream() instead")
     def rgbw_to_spi_bitstream(self, red, green, blue, white):
         """Convert RGBW values to the NeoPixel bitstream format for SPI (GRBW order)"""
         green_bits = self.byte_to_bitstream(green)  # Send green first
@@ -88,6 +93,25 @@ class Pi5Neo:
         white_bits = self.byte_to_bitstream(white) # Then white
         return green_bits + red_bits + blue_bits + white_bits  # Concatenate GRBW order
 
+    def color_to_spi_bitstream(self, pixel_type, red, green, blue, white = 0):
+        """Convert RGB(W) to NeoPixel bitstream format for SPI, following the color order specified in pixel_types"""
+        red_bits = self.byte_to_bitstream(red)
+        green_bits = self.byte_to_bitstream(green)
+        blue_bits = self.byte_to_bitstream(blue)
+        white_bits = self.byte_to_bitstream(white)
+
+        if pixel_type is EPixelType.RGB:
+            return red_bits + green_bits + blue_bits
+        
+        if pixel_type is EPixelType.GRB:
+            return green_bits + red_bits + blue_bits
+
+        if pixel_type is EPixelType.RGBW:
+            return red_bits + green_bits + blue_bits + white_bits
+
+        if pixel_type is EPixelType.GRBW:
+            return green_bits + red_bits + blue_bits + white_bits
+    
     def clear_strip(self):
         """Turn off all LEDs on the strip"""
         self.fill_strip(0, 0, 0, 0)
@@ -113,11 +137,7 @@ class Pi5Neo:
         total_bytes = 0
         for i in range(self.num_leds):
             led = self.led_state[i]  # Get the color for each LED
-
-            if self.pixel_type is EPixelType.RGB:
-                bitstream = self.rgb_to_spi_bitstream(led.red, led.green, led.blue)
-            elif self.pixel_type is EPixelType.RGBW:
-                bitstream = self.rgbw_to_spi_bitstream(led.red, led.green, led.blue, led.white)
+            bitstream = self.color_to_spi_bitstream(self.pixel_type, led.red, led.green, led.blue, led.white)
 
             for j in range(self.bytes_per_led):
                 self.raw_data[total_bytes] = bitstream[j]
