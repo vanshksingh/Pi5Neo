@@ -1,148 +1,225 @@
-# pi5neo/pi5neo.py
+"""
+pi5neo/pi5neo.py — NeoPixel driver for Raspberry Pi 5 via SPI.
+"""
+
 import spidev
 import time
+import warnings
+import functools
 from enum import Enum
-from warnings import deprecated
+from dataclasses import dataclass
+from typing import Optional
+
 
 class EPixelType(Enum):
+    """Supported NeoPixel color channel orderings."""
     RGB = 'RGB'
     GRB = 'GRB'
     RGBW = 'RGBW'
     GRBW = 'GRBW'
 
+
+@dataclass
 class LEDColor:
-    """Represents an RGB or RGBW color for the NeoPixels"""
-    def __init__(self, red=0, green=0, blue=0, white=0):
-        self.red = red
-        self.green = green
-        self.blue = blue
-        self.white = white
+    """Represents an RGB or RGBW color value (0–255 per channel)."""
+    red: int = 0
+    green: int = 0
+    blue: int = 0
+    white: int = 0
+
+
+def _deprecated(reason: str):
+    """Decorator to mark functions as deprecated with a custom message."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            warnings.warn(
+                f"{func.__name__} is deprecated: {reason}",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# Precomputed SPI encoding for NeoPixel protocol bits
+_BIT_HIGH = 0xF8
+_BIT_LOW = 0xC0
+
 
 class Pi5Neo:
-    def __init__(self, spi_device='/dev/spidev0.0', num_leds=10, spi_speed_khz=800, pixel_type=EPixelType.RGB, quiet_mode=False):
-        """Initialize the Pi5Neo class with SPI device, number of LEDs, speed, pixel type, and optional quiet mode"""
+    """Drive WS2812 / SK6812 NeoPixel strips from a Raspberry Pi 5 over SPI."""
+
+    def __init__(
+        self,
+        spi_device: str = '/dev/spidev0.0',
+        num_leds: int = 10,
+        spi_speed_khz: int = 800,
+        pixel_type: EPixelType = EPixelType.GRB,
+        quiet_mode: bool = False,
+    ):
         self.num_leds = num_leds
         self.pixel_type = pixel_type
         self.quiet_mode = quiet_mode
-        self.spi_speed = spi_speed_khz * 1024 * 8  # Convert kHz to bytes per second
-        self.spi = spidev.SpiDev()  # Create SPI device instance
+        self.spi_speed = spi_speed_khz * 1024 * 8
 
-        # Determine bytes per LED based on pixel_type
-        self.pixel_type = pixel_type
-        if (self.pixel_type is EPixelType.RGB) or (self.pixel_type is EPixelType.GRB):
-            self.bytes_per_led = 24  # 3 channels * 8 bits/channel
-        elif (self.pixel_type is EPixelType.RGBW) or (self.pixel_type is EPixelType.GRBW):
-            self.bytes_per_led = 32  # 4 channels * 8 bits/channel
+        self.spi = spidev.SpiDev()
+
+        if pixel_type in (EPixelType.RGB, EPixelType.GRB):
+            self.bytes_per_led = 24  # 3 channels × 8 bits
+        elif pixel_type in (EPixelType.RGBW, EPixelType.GRBW):
+            self.bytes_per_led = 32  # 4 channels × 8 bits
         else:
-            raise ValueError("Invalid pixel_type. Must be one of EPixelType.")
+            raise ValueError(f"Invalid pixel_type: {pixel_type!r}")
 
-        self.raw_data = [0] * (self.num_leds * self.bytes_per_led)  # Placeholder for raw data sent via SPI
-        self.led_state = [LEDColor()] * self.num_leds  # Initial state for each LED (off)
+        self.raw_data = [0] * (self.num_leds * self.bytes_per_led)
 
-        # Open the SPI device
-        if self.open_spi_device(spi_device, quiet_mode):
-            time.sleep(0.1)  # Short delay to ensure device is ready
-            self.clear_strip()  # Clear the strip on startup
+        # Each LED gets its own LEDColor instance (avoids shared-reference bug)
+        self.led_state: list[LEDColor] = [LEDColor() for _ in range(self.num_leds)]
+
+        if self.open_spi_device(spi_device):
+            time.sleep(0.1)
+            self.clear_strip()
             self.update_strip()
 
-    def open_spi_device(self, device_path, quiet_mode):
-        """Open the SPI device with the provided path"""
+    # ------------------------------------------------------------------
+    # SPI helpers
+    # ------------------------------------------------------------------
+
+    def open_spi_device(self, device_path: str) -> bool:
+        """Open the SPI device at *device_path* (e.g. '/dev/spidev0.0')."""
         try:
-            bus, device = map(int, device_path[-3:].split('.'))
+            bus, device = map(int, device_path.split("spidev")[-1].split('.'))
             self.spi.open(bus, device)
             self.spi.max_speed_hz = self.spi_speed
-            if quiet_mode == False:
+            if not self.quiet_mode:
                 print(f"Opened SPI device: {device_path}")
             return True
         except Exception as e:
-            if quiet_mode == False:
+            if not self.quiet_mode:
                 print(f"Failed to open SPI device: {e}")
             return False
 
-    def send_spi_data(self):
-        """Send the raw data buffer to the NeoPixel strip via SPI"""
-        spi_message = bytes(self.raw_data)
-        self.spi.xfer3(list(spi_message))  #previously spi.xfer2
+    def close(self) -> None:
+        """Close the SPI device and release resources."""
+        try:
+            self.spi.close()
+        except Exception:
+            pass
 
-    def bitmask(self, byte, position):
-        """Retrieve the value of a specific bit in a byte"""
-        return bool(byte & (1 << (7 - position)))
+    def send_spi_data(self) -> None:
+        """Transmit the raw bitstream buffer to the strip via SPI."""
+        self.spi.xfer3(self.raw_data)
 
-    def byte_to_bitstream(self, byte):
-        """Convert a byte to the NeoPixel timing bitstream"""
-        bitstream = [0xC0] * 8  # Initialize with LOW bits
-        for i in range(8):
-            if self.bitmask(byte, i):
-                bitstream[i] = 0xF8  # Set HIGH bits for '1'
-        return bitstream
+    # ------------------------------------------------------------------
+    # Bit-level encoding
+    # ------------------------------------------------------------------
 
-    @deprecated("Use color_to_spi_bitstream() instead")
+    @staticmethod
+    def byte_to_bitstream(byte: int) -> list[int]:
+        """Encode a single byte into 8 NeoPixel SPI timing values."""
+        return [_BIT_HIGH if (byte & (1 << (7 - i))) else _BIT_LOW for i in range(8)]
+
+    def color_to_spi_bitstream(
+        self,
+        pixel_type: EPixelType,
+        red: int,
+        green: int,
+        blue: int,
+        white: int = 0,
+    ) -> list[int]:
+        """Convert colour channels to a full NeoPixel SPI bitstream
+        ordered according to *pixel_type*."""
+        r = self.byte_to_bitstream(red)
+        g = self.byte_to_bitstream(green)
+        b = self.byte_to_bitstream(blue)
+        w = self.byte_to_bitstream(white)
+
+        order = {
+            EPixelType.RGB:  (r, g, b),
+            EPixelType.GRB:  (g, r, b),
+            EPixelType.RGBW: (r, g, b, w),
+            EPixelType.GRBW: (g, r, b, w),
+        }
+
+        return [bit for group in order[pixel_type] for bit in group]
+
+    # Keep around for backwards compat, but steer users to the unified method.
+
+    @_deprecated("Use color_to_spi_bitstream() instead")
     def rgb_to_spi_bitstream(self, red, green, blue):
-        """Convert RGB values to the NeoPixel bitstream format for SPI"""
-        green_bits = self.byte_to_bitstream(green)  # Send green first
-        red_bits = self.byte_to_bitstream(red)  # Then red
-        blue_bits = self.byte_to_bitstream(blue)  # Then blue
-        return green_bits + red_bits + blue_bits  # Concatenate GRB order
+        return self.color_to_spi_bitstream(EPixelType.GRB, red, green, blue)
 
-    @deprecated("Use color_to_spi_bitstream() instead")
+    @_deprecated("Use color_to_spi_bitstream() instead")
     def rgbw_to_spi_bitstream(self, red, green, blue, white):
-        """Convert RGBW values to the NeoPixel bitstream format for SPI (GRBW order)"""
-        green_bits = self.byte_to_bitstream(green)  # Send green first
-        red_bits = self.byte_to_bitstream(red)  # Then red
-        blue_bits = self.byte_to_bitstream(blue)  # Then blue
-        white_bits = self.byte_to_bitstream(white) # Then white
-        return green_bits + red_bits + blue_bits + white_bits  # Concatenate GRBW order
+        return self.color_to_spi_bitstream(EPixelType.GRBW, red, green, blue, white)
 
-    def color_to_spi_bitstream(self, pixel_type, red, green, blue, white = 0):
-        """Convert RGB(W) to NeoPixel bitstream format for SPI, following the color order specified in pixel_types"""
-        red_bits = self.byte_to_bitstream(red)
-        green_bits = self.byte_to_bitstream(green)
-        blue_bits = self.byte_to_bitstream(blue)
-        white_bits = self.byte_to_bitstream(white)
+    # ------------------------------------------------------------------
+    # Public LED API
+    # ------------------------------------------------------------------
 
-        if pixel_type is EPixelType.RGB:
-            return red_bits + green_bits + blue_bits
-        
-        if pixel_type is EPixelType.GRB:
-            return green_bits + red_bits + blue_bits
-
-        if pixel_type is EPixelType.RGBW:
-            return red_bits + green_bits + blue_bits + white_bits
-
-        if pixel_type is EPixelType.GRBW:
-            return green_bits + red_bits + blue_bits + white_bits
-    
-    def clear_strip(self):
-        """Turn off all LEDs on the strip"""
+    def clear_strip(self) -> None:
+        """Turn off every LED (sets all channels to 0)."""
         self.fill_strip(0, 0, 0, 0)
 
-    def fill_strip(self, red=0, green=0, blue=0, white=0):
-        """Fill the entire strip with a specific color"""
-        color = LEDColor(red, green, blue, white)
-        self.led_state = [color] * self.num_leds  # Set all LEDs to the same color
+    def fill_strip(self, red: int = 0, green: int = 0, blue: int = 0, white: int = 0) -> None:
+        """Set every LED on the strip to the same colour."""
+        self.led_state = [LEDColor(red, green, blue, white) for _ in range(self.num_leds)]
 
-    def set_led_color(self, index, red, green, blue, white=0):
-        """Set the color of an individual LED"""
+    def set_led_color(self, index: int, red: int, green: int, blue: int, white: int = 0) -> bool:
+        """Set the colour of a single LED by index. Returns False if index is out of range."""
         if 0 <= index < self.num_leds:
             self.led_state[index] = LEDColor(red, green, blue, white)
             return True
         return False
 
-    def update_strip(self, sleep_duration=0.1):
-        """Send the current state of the LED strip to the NeoPixels
-         Parameters:
-        - sleep_duration (float): The duration (in seconds) to pause after sending the data.
-          If None, no delay is introduced.
-        """
-        total_bytes = 0
-        for i in range(self.num_leds):
-            led = self.led_state[i]  # Get the color for each LED
-            bitstream = self.color_to_spi_bitstream(self.pixel_type, led.red, led.green, led.blue, led.white)
+    def set_led_color_object(self, index: int, color: LEDColor) -> bool:
+        """Set a single LED's colour using an LEDColor instance."""
+        if 0 <= index < self.num_leds:
+            self.led_state[index] = LEDColor(color.red, color.green, color.blue, color.white)
+            return True
+        return False
 
-            for j in range(self.bytes_per_led):
-                self.raw_data[total_bytes] = bitstream[j]
-                total_bytes += 1
+    def get_led_color(self, index: int) -> Optional[LEDColor]:
+        """Return the current LEDColor for *index*, or None if out of range."""
+        if 0 <= index < self.num_leds:
+            c = self.led_state[index]
+            return LEDColor(c.red, c.green, c.blue, c.white)
+        return None
+
+    def update_strip(self, sleep_duration: Optional[float] = 0.1) -> None:
+        """Flush the current LED state to the physical strip via SPI.
+
+        Parameters
+        ----------
+        sleep_duration : float or None
+            Seconds to wait after transmission (gives the strip time to latch).
+            Pass ``None`` to skip the delay.
+        """
+        idx = 0
+        for led in self.led_state:
+            bitstream = self.color_to_spi_bitstream(
+                self.pixel_type, led.red, led.green, led.blue, led.white
+            )
+            self.raw_data[idx:idx + self.bytes_per_led] = bitstream
+            idx += self.bytes_per_led
+
         self.send_spi_data()
 
         if sleep_duration is not None:
             time.sleep(sleep_duration)
+
+    # ------------------------------------------------------------------
+    # Context manager support
+    # ------------------------------------------------------------------
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.clear_strip()
+        self.update_strip(sleep_duration=None)
+        self.close()
+        return False
+
