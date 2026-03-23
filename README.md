@@ -2,158 +2,241 @@
 
 ### Simplifying NeoPixel LED Control on Raspberry Pi 5 via SPI (GPIO 10)
 
-[![PyPI version](https://badge.fury.io/py/Pi5Neo.svg)](https://badge.fury.io/py/Pi5Neo) 
+[![PyPI version](https://badge.fury.io/py/Pi5Neo.svg)](https://badge.fury.io/py/Pi5Neo)
 [![Python Versions](https://img.shields.io/pypi/pyversions/Pi5Neo.svg)](https://pypi.org/project/Pi5Neo)
 [![License](https://img.shields.io/github/license/vanshksingh/Pi5Neo)](LICENSE)
 
 ![IMG_7596](https://github.com/user-attachments/assets/6fb727ae-789e-4d25-9dd7-38599fdbb81e)
 
-Pi5Neo is a Python library designed to make controlling **NeoPixel LED strips** super easy and efficient on the **Raspberry Pi 5** (or equivalent boards). Whether you're creating dazzling light shows, informative displays, or ambient lighting, Pi5Neo simplifies the process using the Raspberry Pi’s **SPI interface** for high-performance communication.
+Pi5Neo is a Python library for controlling **NeoPixel LED strips** on the **Raspberry Pi 5** (or equivalent boards) over the **SPI interface**. It supports both RGB (WS2812B) and RGBW (SK6812) strips, exposes a clean context-manager API, and ships with a growing set of ready-to-run examples.
 
-## 🌟 Key Features
+---
 
-- **Easy NeoPixel Control**: Send commands to any NeoPixel LED strip connected to the Raspberry Pi 5’s SPI interface.
-- **Smooth Transitions**: Enjoy vibrant color transitions with rainbow effects, loading bars, blinking patterns, and more.
-- **Optimized for Performance**: Tailored for the Raspberry Pi 5, ensuring fast and reliable communication with NeoPixel strips.
-- **Minimalistic API**: A simple API lets you focus on creativity without worrying about low-level hardware details.
-- **Flexible Configurations**: Control various effects and animations by easily setting colors, durations, and brightness levels.
+## What's New in v1.1.0
 
-## 🚀 Installation
+- **RGBW / SK6812 support** — new `EPixelType` enum (`RGB`, `GRB`, `RGBW`, `GRBW`) lets you select the exact channel order for your strip hardware.
+- **`LEDColor` dataclass** — represent colors as structured objects; read back any LED's current state with `get_led_color()`.
+- **`set_led_color_object()` / `get_led_color()`** — object-oriented helpers alongside the existing index-based API.
+- **Context-manager support** — `with Pi5Neo(...) as neo:` guarantees the strip is cleared and SPI is released on exit, even after exceptions.
+- **`quiet_mode` parameter** — suppress all console output for production scripts.
+- **Configurable `update_strip` delay** — pass `sleep_duration=None` to skip the latch delay, or any float for custom timing.
+- **Reorganised examples** — split into `basic/`, `animations/`, and `effects/` sub-directories with clean, well-commented scripts.
+- **Deprecated helpers** — `rgb_to_spi_bitstream()` and `rgbw_to_spi_bitstream()` now emit `DeprecationWarning`; use `color_to_spi_bitstream()` instead.
 
-You can install Pi5Neo via `pip`:
+---
+
+## Key Features
+
+- **RGB and RGBW support** — WS2812B (GRB) and SK6812 (RGBW/GRBW) out of the box.
+- **`LEDColor` dataclass** — structured colour values with per-channel access.
+- **Context-manager API** — automatic cleanup with `with` statements.
+- **Quiet mode** — silence all print output for daemon/production use.
+- **Smooth animations** — rainbow, breathing, comet, meteor, fireworks, theater chase, and more.
+- **Minimal dependencies** — only `spidev` required.
+- **High LED count support** — configurable kernel SPI buffer for 170+ LEDs.
+
+---
+
+## Installation
 
 ```bash
 pip install pi5neo
 ```
 
 ### Requirements
-- **Python 3.6+**
-- **spidev** (automatically installed with Pi5Neo)
+
+- Python 3.6+
+- `spidev` (installed automatically)
 
 ### Hardware
-- **Raspberry Pi 5** (or equivalent with SPI interface)
-- **NeoPixel LED Strip** (WS281x family)
 
-## 📚 Usage
+- Raspberry Pi 5 (or equivalent board with SPI)
+- NeoPixel LED strip — WS2812B (RGB/GRB) or SK6812 (RGBW/GRBW)
 
-Pi5Neo makes it straightforward to set up and control your NeoPixel strip. Here's a simple example:
+---
 
-First: Enable SPI for the board:
+## Setup: Enable SPI
+
+```bash
 sudo raspi-config
--> 3 Interface Options
--> I4 SPI
--> Yes
+# → 3 Interface Options → I4 SPI → Yes
+```
 
-Then:
+---
+
+## Quick Start
 
 ```python
 from pi5neo import Pi5Neo
 
-# Initialize the Pi5Neo class with 10 LEDs and an SPI speed of 800kHz
-neo = Pi5Neo('/dev/spidev0.0', 10, 800)
+# Initialize with 10 LEDs at 800 kHz on /dev/spidev0.0
+neo = Pi5Neo('/dev/spidev0.0', num_leds=10, spi_speed_khz=800)
 
-# Fill the strip with a red color
-neo.fill_strip(255, 0, 0)
-neo.update_strip()  # Commit changes to the LEDs
+neo.fill_strip(255, 0, 0)   # Red
+neo.update_strip()
 
-# Set the 5th LED to blue
-neo.set_led_color(4, 0, 0, 255)
+neo.set_led_color(4, 0, 0, 255)  # Blue on LED #5
 neo.update_strip()
 ```
 
-## 🌈 Examples
+### Context Manager (recommended)
 
-You can find more advanced examples in the [examples](examples) directory. Here’s a quick showcase of some cool effects you can create with Pi5Neo:
+The strip is always cleared and SPI released on exit, even if an exception occurs:
 
-### Example 1: Rainbow Cycle
 ```python
 from pi5neo import Pi5Neo
-import time
 
-def rainbow_cycle(neo, delay=0.1):
-    colors = [
-        (255, 0, 0),  # Red
-        (255, 127, 0),  # Orange
-        (255, 255, 0),  # Yellow
-        (0, 255, 0),  # Green
-        (0, 0, 255),  # Blue
-        (75, 0, 130),  # Indigo
-        (148, 0, 211)  # Violet
-    ]
-    for color in colors:
-        neo.fill_strip(*color)
-        neo.update_strip()
-        time.sleep(delay)
-
-neo = Pi5Neo('/dev/spidev0.0', 10, 800)
-rainbow_cycle(neo)
+with Pi5Neo('/dev/spidev0.0', num_leds=10, spi_speed_khz=800, quiet_mode=True) as neo:
+    neo.fill_strip(0, 255, 0)   # Green
+    neo.update_strip()
+    # SPI closed and strip cleared automatically here
 ```
 
-### Example 2: Loading Bar Effect
-```python
-from pi5neo import Pi5Neo
-import time
+### RGBW / SK6812 Strips
 
-def loading_bar(neo):
-    for i in range(neo.num_leds):
-        neo.set_led_color(i, 0, 255, 0)  # Green loading bar
-        neo.update_strip()
-        time.sleep(0.2)
-    neo.clear_strip()
+```python
+from pi5neo import Pi5Neo, EPixelType
+
+with Pi5Neo('/dev/spidev0.0', num_leds=10, spi_speed_khz=800,
+            pixel_type=EPixelType.GRBW, quiet_mode=True) as neo:
+    neo.fill_strip(0, 0, 0, 255)   # White channel only
+    neo.update_strip()
+```
+
+### LEDColor Objects
+
+```python
+from pi5neo import Pi5Neo, LEDColor
+
+with Pi5Neo('/dev/spidev0.0', num_leds=10, spi_speed_khz=800, quiet_mode=True) as neo:
+    color = LEDColor(red=255, green=128, blue=0)
+    neo.set_led_color_object(0, color)
     neo.update_strip()
 
-neo = Pi5Neo('/dev/spidev0.0', 10, 800)
-loading_bar(neo)
+    # Read the current colour of any LED
+    current = neo.get_led_color(0)
+    print(current)   # LEDColor(red=255, green=128, blue=0, white=0)
 ```
 
+---
 
-## ⚙️ Configuration
+## API Reference
 
-You can configure Pi5Neo by passing in different parameters for the number of LEDs, SPI speed, and more:
+### `Pi5Neo(spi_device, num_leds, spi_speed_khz, pixel_type, quiet_mode)`
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `spi_device` | `str` | `'/dev/spidev0.0'` | SPI device path |
+| `num_leds` | `int` | `10` | Number of LEDs in the strip |
+| `spi_speed_khz` | `int` | `800` | SPI clock speed in kHz |
+| `pixel_type` | `EPixelType` | `EPixelType.GRB` | Channel order — `RGB`, `GRB`, `RGBW`, or `GRBW` |
+| `quiet_mode` | `bool` | `False` | Suppress all console output |
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `fill_strip(r, g, b, w=0)` | Set every LED to the same colour |
+| `set_led_color(index, r, g, b, w=0)` | Set a single LED by index |
+| `set_led_color_object(index, LEDColor)` | Set a single LED using an `LEDColor` instance |
+| `get_led_color(index)` | Return the current `LEDColor` for an LED (copy) |
+| `clear_strip()` | Turn off all LEDs |
+| `update_strip(sleep_duration=0.1)` | Flush state to the strip; pass `None` to skip latch delay |
+| `close()` | Close the SPI device |
+
+### `EPixelType`
+
+| Value | Strip type |
+|---|---|
+| `EPixelType.GRB` | WS2812B (most common) |
+| `EPixelType.RGB` | Some RGB strips |
+| `EPixelType.GRBW` | SK6812 RGBW (GRB channel order) |
+| `EPixelType.RGBW` | SK6812 RGBW (RGB channel order) |
+
+### `LEDColor`
 
 ```python
-Pi5Neo('/dev/spidev0.0', num_leds=20, spi_speed_khz=1000)
+from pi5neo import LEDColor
+
+c = LEDColor(red=255, green=0, blue=128, white=0)
 ```
 
-- **`/dev/spidev0.0`**: SPI device path
-- **`num_leds`**: Number of LEDs in the NeoPixel strip
-- **`spi_speed_khz`**: SPI speed in kHz (default 800)
+All fields default to `0`. The `white` field is only used with RGBW pixel types.
+
+---
+
+## Examples
+
+Examples are organized under the `examples/` directory:
+
+```
+examples/
+├── basic/
+│   ├── example_usage.py      # Solid color + rainbow cycle
+│   ├── single_led.py         # Single LED control
+│   ├── random_blink.py       # Random blinking LEDs
+│   ├── pixel_types.py        # EPixelType demo (RGB / RGBW)
+│   ├── led_color_object.py   # LEDColor dataclass + color shifting
+│   └── context_manager.py    # Context manager / safe cleanup
+├── animations/
+│   ├── breath.py             # Breathing / pulse effect
+│   ├── fade.py               # Fade in / fade out
+│   ├── smooth_fade.py        # Cosine smooth fade
+│   ├── rainbow.py            # Rainbow wave
+│   └── thinking.py           # "Thinking" spinner animation
+└── effects/
+    ├── comet.py              # Comet tail
+    ├── meteor.py             # Meteor shower
+    ├── firework.py           # Firework burst
+    ├── knight_rider.py       # Knight Rider scanner
+    ├── snake.py              # Snake crawl
+    ├── ripple.py             # Ripple effect
+    ├── twinkle.py            # Random twinkle
+    ├── loading.py            # Loading bar
+    ├── colour_bounce.py      # Colour bounce
+    └── theater_chase.py      # Theater chase
+```
+
+---
 
 ## Driving High LED Counts
 
-The default `spidev` buffer of 4096 bytes accommodates approximately 170 LEDs. For higher LED counts, it is necessary to increase this buffer. This is done by adding `spidev.bufsiz=<size_in_bytes>` to the single line in `/boot/firmware/cmdline.txt` and rebooting.
+The default `spidev` kernel buffer is 4096 bytes, which supports up to ~170 LEDs. For larger strips, increase the buffer by appending to the single line in `/boot/firmware/cmdline.txt` and rebooting:
 
-For example, to set the buffer to 32KB:
-`spidev.bufsiz=32768`
+```
+spidev.bufsiz=32768
+```
 
-## 🛠️ Contributing
+For RGBW strips the per-LED byte cost is higher (32 bytes vs. 24), so adjust accordingly.
 
-We welcome contributions from the community! To contribute:
+---
+
+## Contributing
 
 1. Fork the repo.
-2. Create a new branch (`git checkout -b my-feature`).
-3. Commit your changes (`git commit -m 'Add new feature'`).
-4. Push to the branch (`git push origin my-feature`).
-5. Create a new Pull Request.
+2. Create a branch: `git checkout -b my-feature`
+3. Commit your changes: `git commit -m 'Add new feature'`
+4. Push: `git push origin my-feature`
+5. Open a Pull Request.
 
-Feel free to open issues for bugs, questions, or feature requests.
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## ❤️ Acknowledgements
-
-Pi5Neo was inspired by various open-source projects that aim to make hardware control easier and more accessible. Special thanks to the contributors of `spidev` and Raspberry Pi for their amazing support!
+Issues and feature requests are welcome!
 
 ---
 
-Now, let your **Raspberry Pi 5** light up the room with **Pi5Neo**!
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-### 🔗 Useful Links
+## Acknowledgements
+
+Pi5Neo was inspired by various open-source NeoPixel and SPI projects. Thanks to all contributors and to the maintainers of `spidev` and the Raspberry Pi ecosystem.
+
+---
+
+### Useful Links
+
 - [Pi5Neo on PyPI](https://pypi.org/project/Pi5Neo)
 - [Pi5Neo GitHub Repository](https://github.com/vanshksingh/Pi5Neo)
 - [Raspberry Pi Official Website](https://www.raspberrypi.org)
-

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "Pi5Neo"
+version = "1.1.0"
+description = "A NeoPixel LED control library for Raspberry Pi 5 using SPI"
+readme = "README.md"
+requires-python = ">=3.6"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Vansh Kumar Singh" }
+]
+keywords = ["raspberrypi5", "neopixel", "spi", "led-strip", "hardware"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: System :: Hardware :: Hardware Drivers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = ["spidev"]
+
+[project.urls]
+Homepage = "https://github.com/vanshksingh/Pi5Neo"
+Repository = "https://github.com/vanshksingh/Pi5Neo"
+
+[tool.setuptools.packages.find]
+where = ["."]
