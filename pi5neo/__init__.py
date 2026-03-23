@@ -1,1 +1,1 @@
-from .pi5neo import Pi5Neo, EPixelType
+from .pi5neo import Pi5Neo, EPixelType, LEDColor
