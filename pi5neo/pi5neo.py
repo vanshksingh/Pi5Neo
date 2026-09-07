@@ -44,7 +44,7 @@ def _deprecated(reason: str):
 
 
 # Precomputed SPI encoding for NeoPixel protocol bits
-_BIT_HIGH = 0xF8
+_BIT_HIGH = 0xFC
 _BIT_LOW = 0xC0
 
 
