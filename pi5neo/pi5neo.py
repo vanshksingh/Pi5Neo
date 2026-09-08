@@ -58,10 +58,12 @@ class Pi5Neo:
         spi_speed_khz: int = 800,
         pixel_type: EPixelType = EPixelType.GRB,
         quiet_mode: bool = False,
+        preamble_bytes: int = 0
     ):
         self.num_leds = num_leds
         self.pixel_type = pixel_type
         self.quiet_mode = quiet_mode
+        self.preamble_bytes = preamble_bytes
         self.spi_speed = spi_speed_khz * 1024 * 8
 
         self.spi = spidev.SpiDev()
@@ -73,7 +75,7 @@ class Pi5Neo:
         else:
             raise ValueError(f"Invalid pixel_type: {pixel_type!r}")
 
-        self.raw_data = [0] * (self.num_leds * self.bytes_per_led)
+        self.raw_data = [0] * (self.preamble_bytes + self.num_leds * self.bytes_per_led)
 
         # Each LED gets its own LEDColor instance (avoids shared-reference bug)
         self.led_state: list[LEDColor] = [LEDColor() for _ in range(self.num_leds)]
@@ -197,7 +199,7 @@ class Pi5Neo:
             Seconds to wait after transmission (gives the strip time to latch).
             Pass ``None`` to skip the delay.
         """
-        idx = 0
+        idx = self.preamble_bytes
         for led in self.led_state:
             bitstream = self.color_to_spi_bitstream(
                 self.pixel_type, led.red, led.green, led.blue, led.white
